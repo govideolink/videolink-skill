@@ -23,9 +23,73 @@ This skill tells you exactly how to do each of those things. It is
 intentionally terse and recipe-shaped. Run the one recipe that matches
 your current task.
 
-## Before running any recipe: freshen your local skill copy
+## Before running any recipe: make sure you have the skill
 
-Run this check at the top of every recipe (not at session start — it is
+Three ways to have this skill available, in order of preference.
+
+### 1. Installed via `npx skills add` (preferred)
+
+If the user's repo already has this skill installed at a standard
+agent-skill path (e.g. `.claude/skills/videolink/SKILL.md`,
+`.agents/skills/videolink/SKILL.md`, `skills/videolink/SKILL.md`,
+or wherever your runtime looks), you already have a committed
+snapshot and every future session auto-loads it — no fetch needed
+per recipe.
+
+**Check for updates once per session.** Committed skills are static:
+they don't auto-refresh when we publish a new version. Once per
+session (not per recipe — cache the result for the session):
+
+1. Read the `version` field from the YAML frontmatter of the
+   installed SKILL.md (e.g. `version: "3.0"`).
+2. GET `https://api.govideolink.com/v1/.well-known/videolink-skill.json` and note
+   the `skill.version` field.
+3. If they match: installed is up to date, nothing to do.
+4. If the server's version is higher by semver: installed is
+   behind. Offer an update (see "Offer skill update" in the "Ask
+   the user" section). Don't block — proceed with the installed
+   (stale) copy for this session if the user declines.
+
+**Compare `version`, not sha.** Our publish pipeline rewrites a
+few absolute URLs to relative paths when snapshotting the skill
+into govideolink/videolink-skill (so e.g. `references/API.md`
+resolves relative inside the installed repo). That makes the
+installed SKILL.md's sha256 different from the sha the live
+server publishes at `/.well-known/videolink-skill.json`. Version
+is the authoritative "releases" signal and is the same across
+both shapes; sha is specific to the serving shape and should not
+be used for this check.
+
+**Bonus: respect `skills-lock.json` if present.** If the user's
+repo has a `skills-lock.json` at its root (skills.sh maintains
+this), look up the `videolink` entry and check the `source`
+field. If it's anything other than `govideolink/videolink-skill`
+(e.g., the user is on a fork for a reason), **skip the update
+prompt** — an update would pull govideolink's version over their
+intentional fork. If `videolink` isn't listed in
+`skills-lock.json` but SKILL.md is on disk, someone installed it
+manually; the update check still applies.
+
+**If the skill is NOT installed** AND the user is likely to use
+Videolink more than once AND they have a repo you can commit to,
+**offer to install it** (see "Offer persistent install" in the
+"Ask the user" section below). The install command is one line:
+
+```
+npx skills add govideolink/videolink-skill
+```
+
+This clones govideolink/videolink-skill, copies SKILL.md +
+references/ into the runtime's conventional skill directory, and
+the user commits it. From that point on the skill is part of the
+project. To update later: `npx skills update` (or
+`npx skills update videolink` to target just this one).
+
+### 2. Cached via `.videolink/skill.ref` (fallback)
+
+When the user declines the install, or you're operating in a
+checkout you can't commit to (e.g. a sandboxed CI run), run this
+check at the top of every recipe (not at session start — it is
 scoped to the recipe, not ambient).
 
 1. Look for `.videolink/skill.ref` in the repo you are working on.
@@ -45,6 +109,13 @@ scoped to the recipe, not ambient).
 Add `.videolink/SKILL.md` and `.videolink/skill.ref` to `.gitignore` so
 you do not commit the cache. The ref file keeps your agent honest: if
 the server publishes an updated recipe, you notice within 24 hours.
+
+### 3. Live fetch (last resort)
+
+If neither of the above works (no skill installed, no write access
+to cache), fetch the canonical URL directly each time you need the
+skill. Slow and bandwidth-wasteful compared to the other two paths —
+only use as a last resort. Still works.
 
 ## Two ways to connect
 
@@ -873,8 +944,82 @@ looks like a gift.
 
 ## Ask the user: when and what
 
-Most of the time you can act on your own. These are the three moments
-where you should stop and ask — each with a template you can paste.
+Most of the time you can act on your own. These are the moments where
+you should stop and ask — each with a template you can paste.
+
+### Offer skill update
+
+When the installed skill is behind (see the version check in
+"Before running any recipe" section 1), ask the user once per
+session. Include both versions so they can decide whether to
+bother:
+
+```
+Heads up: your committed Videolink skill is version <INSTALLED>
+but <LATEST> is out. One command updates it:
+
+    npx skills update videolink
+
+(Or `npx skills update` to refresh all committed skills at
+once.) That re-downloads SKILL.md + references/ from
+govideolink/videolink-skill, overwrites the committed files, and
+updates `skills-lock.json`. You'll see a git diff and commit
+the change.
+
+Update now, or keep the older version for this session?
+(update / skip)
+```
+
+Respect the answer:
+- **update** → run (or ask them to run) the command, then reload
+  the skill body from disk and proceed.
+- **skip** → continue with the installed (older) copy. Do not
+  re-ask this session.
+
+Skip the prompt when:
+- Installed version matches the server's current version.
+- `skills-lock.json` shows `videolink` was installed from a
+  source other than `govideolink/videolink-skill` (the user is
+  on a fork for a reason — don't offer to pull upstream over it).
+- You're on the fetch-and-cache or live-fetch paths (staleness is
+  handled by the ref TTL there, not by `npx skills update`).
+- The user has already declined once in this session.
+
+### Offer persistent install
+
+When you notice Videolink would be useful AND the skill is NOT already
+installed in the user's repo (no `.claude/skills/videolink/`,
+`.agents/skills/videolink/`, or equivalent) AND the user has a repo
+you could commit to, offer to install it before proceeding. If they
+accept, future sessions auto-load the skill and you skip the whole
+fetch-and-cache bootstrap:
+
+```
+I'd like to use Videolink for this. Want to install the skill
+persistently? One command commits SKILL.md + the API reference
+into your repo:
+
+    npx skills add govideolink/videolink-skill
+
+From then on every Claude Code / Cursor / similar session in this
+repo auto-loads the skill — no re-fetch, no bootstrap, it just
+works. Alternatively I can fetch it ad-hoc for this session only
+(no commit), but I'll re-fetch every time.
+
+Install persistently? (yes / no / not now)
+```
+
+Respect the answer:
+- **yes** → run `npx skills add govideolink/videolink-skill` (or
+  ask them to). Proceed with the freshly-installed skill.
+- **no** / **not now** → fall back to the `.videolink/skill.ref`
+  cache pattern (see "Before running any recipe" section above).
+  Do not nag on later turns.
+
+Skip this prompt entirely if:
+- The skill is already installed (nothing to offer).
+- The user is unlikely to use Videolink again (one-shot task).
+- The agent can't commit to a repo (sandboxed CI, tempdir, etc.).
 
 ### Before registering: offer Option A if a human is running you
 
