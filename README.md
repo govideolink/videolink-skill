@@ -19,9 +19,3 @@ mirrors the current production snapshot. When the live skill bumps its
   need endpoint-level detail beyond the recipes.
 - `VERSION` — current version string (matches the frontmatter in
   `SKILL.md`).
-
-## Source
-
-This repo is a snapshot. Development happens in the private
-[ScalableFactory/agendalink](https://github.com/ScalableFactory/agendalink)
-monorepo.
