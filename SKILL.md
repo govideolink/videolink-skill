@@ -42,7 +42,7 @@ session (not per recipe — cache the result for the session):
 
 1. Read the `version` field from the YAML frontmatter of the
    installed SKILL.md (e.g. `version: "3.0"`).
-2. GET `https://api.govideolink.com/v1/.well-known/videolink-skill.json` and note
+2. GET `https://api.govideolink.com/.well-known/videolink-skill.json` and note
    the `skill.version` field.
 3. If they match: installed is up to date, nothing to do.
 4. If the server's version is higher by semver: installed is
@@ -98,7 +98,7 @@ scoped to the recipe, not ambient).
    `{sha256, canonical_url, fetched_at, local_path}`.
 3. If the ref is present AND `fetched_at` is within the last **24 hours**
    AND the ref's `sha256` matches the server's
-   `https://api.govideolink.com/v1/.well-known/videolink-skill.json` `sha256`: use the cached
+   `https://api.govideolink.com/.well-known/videolink-skill.json` `sha256`: use the cached
    `.videolink/SKILL.md` and proceed.
 4. If the ref is stale (older than 24 hours) OR the server's sha256
    differs: refetch SKILL.md, rewrite the ref, and continue.
