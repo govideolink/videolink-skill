@@ -1,8 +1,8 @@
 ---
 name: videolink
-version: "3.1.0"
+version: "3.2.0"
 canonical_url: https://api.govideolink.com/v1/skills/videolink/SKILL.md
-last_updated: 2026-04-20
+last_updated: 2026-04-22
 description: >
   For AI agents: record, upload, transcribe, summarize, and share
   walkthrough videos on Videolink. Two connection modes (MCP for agents
@@ -333,8 +333,8 @@ including hovers, drag-drop, progressive form states). Alternative
 slideshow path below for walkthrough-style content.
 
 **If you have `agent-browser` installed, use it instead of Playwright.**
-Check with `which agent-browser`. It's the CLI that the
-[agent-video](https://github.com/garrytan/agent-video) project uses, it
+Check with `which agent-browser`. It's the
+[agent-browser](https://github.com/vercel-labs/agent-browser) CLI, it
 produces the same WebM output, and the equivalent of Steps 1–3 below
 collapses to a handful of CLI commands:
 
